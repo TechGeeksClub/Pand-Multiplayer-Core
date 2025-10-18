@@ -13,7 +13,6 @@
     "pandnet"
   ],
   "dependencies": {
-    "com.pandnet.core": "https://github.com/TechGeeksClub/Pand-Multiplayer-Core.git"
   },
   "samples": [],
   "changelogUrl": "https://github.com/pandapp/pandnet-core/releases",
