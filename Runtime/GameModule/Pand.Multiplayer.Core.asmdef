@@ -1,0 +1,9 @@
+{
+  "name": "Pand.Multiplayer.Core",
+  "references": [
+    "Unity.Netcode.GameObjects"
+    // Başka UGS paketleri varsa (Lobby, Relay) buraya eklenecek
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": []
+}
