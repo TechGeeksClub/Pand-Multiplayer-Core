@@ -1,3 +1,14 @@
 {
-	"name": "Pand.Multiplayer.Core"
+	"name": "Pand.Multiplayer.Core",
+	"rootNamespace": "PandNet.Core",
+	"references": [],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": true,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
 }
