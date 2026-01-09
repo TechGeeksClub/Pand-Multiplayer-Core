@@ -1,37 +1,47 @@
 # Pandapp Multiplayer Framework
 
-Reusable multiplayer framework paketi (Core + Transport + UI katmanları).
+Reusable multiplayer framework package (Core + Transport + App + optional Gameplay/UI).
 
 ## Install (UPM)
 
-Unity Package Manager → **Add package from git URL**:
+Unity Package Manager -> **Add package from git URL**:
 
 `https://<repo>.git?path=/Packages/com.pandapp.multiplayer#v0.1.0`
 
 ## Structure
 
-- `Runtime/Core` → oyun-agnostic kontratlar ve data tipleri (`Pandapp.Multiplayer.Core`)
-- `Runtime/App` → Unity entry/config katmanı (`Pandapp.Multiplayer.App`)
-- `Runtime/Transport/PhotonPun2` → Photon PUN2 adapter katmanı (`Pandapp.Multiplayer.Transport.Pun2`)
-- `Runtime/UI` → opsiyonel UI katmanı (`Pandapp.Multiplayer.UI`)
+- `Runtime/Core` -> game-agnostic contracts + data types (`Pandapp.Multiplayer.Core`)
+- `Runtime/App` -> Unity entry/config layer (`Pandapp.Multiplayer.App`)
+- `Runtime/Transport/PhotonPun2` -> Photon PUN2 adapter (`Pandapp.Multiplayer.Transport.Pun2`)
+- `Runtime/Gameplay` -> reusable gameplay primitives (`Pandapp.Multiplayer.Gameplay`)
+- `Runtime/UI` -> optional UI layer (`Pandapp.Multiplayer.UI`)
 
-## Bootstrap (Minimal)
+## Bootstrap (minimal)
 
-1) Sahneye `MultiplayerApp` ekle ve `transportBehaviour` alanına bir transport component bağla.
-2) (Opsiyonel) `SceneCatalog` + `MultiplayerConfig` oluşturup `MultiplayerApp.config` alanına ver.
-3) Mesaj ID aralığı: Core `1-99` rezerve; oyun mesajları için `100+` kullan.
-4) Quick match için `MultiplayerApp.QuickMatch(...)` çağır (join random, yoksa create).
+1) Add `MultiplayerApp` to your Bootstrap scene.
+2) Assign `transportBehaviour` (ex: `Pun2NetworkTransport`).
+3) (Optional) Assign `MultiplayerConfig` + `SceneCatalog`.
+4) Message IDs: Core uses `1-99`. Gameplay primitives use `200-209`. Use `100-199` (or `210+`) for your game.
+
+## Matchmaking
+
+- `ConnectOptions.GameVersion` isolates matchmaking pools (both clients must match).
+- `QuickMatchOptions` supports `MaxPlayers`, `QueueId`, `ModeId`, `MapId`, and `CustomProperties`.
+
+## Gameplay primitives (v0.1)
+
+- `NetworkIdentity` gives an object a `NetworkId` (scene: set in editor, spawned: assigned at runtime).
+- `NetworkTransformSync` replicates transform state (host/owner authority + interpolation).
+- `NetworkPrefabCatalog` maps `PrefabId -> prefab` for network spawning.
+- `NetworkSpawner` lets the host spawn/despawn objects + replicate ownership (syncs existing spawns to late joiners).
 
 ## Photon PUN2 (CS0234 fix)
 
-`Pun2NetworkTransport` ayrı bir asmdef içinde derlenir; bu yüzden Photon assembly’leri referanslanabilir olmalı.
+`Pun2NetworkTransport` is compiled in a separate asmdef. To avoid `Photon.Pun` reference errors:
 
-1) Photon PUN2’yi import et (define: `PHOTON_UNITY_NETWORKING`).
-2) Unity menüsü: `Pandapp/Multiplayer/Photon PUN2/Setup (Fix CS0234)`
-   - Gerekirse Photon için asmdef oluşturur
-   - `PANDAPP_PHOTON_PUN2` define’ını ekler
-3) Derleme bitince `Pun2NetworkTransport` kullan.
+1) Import Photon PUN2 (define: `PHOTON_UNITY_NETWORKING`).
+2) Unity menu: `Pandapp/Multiplayer/Photon PUN2/Setup (Fix CS0234)` (adds `PANDAPP_PHOTON_PUN2` + asmdefs if needed).
 
 ## Samples
 
-Unity Package Manager → bu paket → **Samples** → **Minimal Demo** → **Import**
+Unity Package Manager -> this package -> **Samples** -> **Minimal Demo** -> **Import**

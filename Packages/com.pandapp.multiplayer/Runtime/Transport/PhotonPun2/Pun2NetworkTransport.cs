@@ -75,6 +75,11 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 PhotonNetwork.AuthValues = new AuthenticationValues(options.UserId);
             }
 
+            if (!string.IsNullOrEmpty(options?.GameVersion))
+            {
+                PhotonNetwork.GameVersion = options.GameVersion;
+            }
+
             SetConnectionState(TransportConnectionState.Connecting);
 
             if (!PhotonNetwork.ConnectUsingSettings())
@@ -118,6 +123,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 IsOpen = options.IsOpen,
             };
 
+            ApplyCustomProperties(photonOptions, options.CustomProperties);
             PhotonNetwork.CreateRoom(options.RoomCode, photonOptions);
         }
 
@@ -175,7 +181,24 @@ namespace Pandapp.Multiplayer.Transport.Pun2
 
         private void TryJoinRandomRoomOrCreate()
         {
-            if (!PhotonNetwork.JoinRandomRoom())
+            var resolved = pendingQuickMatch ?? new QuickMatchOptions();
+            var matchProperties = BuildMatchProperties(resolved);
+            var expectedMaxPlayers = resolved.MaxPlayers;
+
+            bool joinResult;
+            if (matchProperties.Count == 0)
+            {
+                joinResult = expectedMaxPlayers == 0
+                    ? PhotonNetwork.JoinRandomRoom()
+                    : PhotonNetwork.JoinRandomRoom(null, expectedMaxPlayers);
+            }
+            else
+            {
+                var expectedProperties = BuildPhotonHashtable(matchProperties);
+                joinResult = PhotonNetwork.JoinRandomRoom(expectedProperties, expectedMaxPlayers);
+            }
+
+            if (!joinResult)
             {
                 CreateQuickMatchRoom();
             }
@@ -234,6 +257,128 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             return PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null;
         }
 
+        private static Dictionary<string, object> BuildMatchProperties(QuickMatchOptions options)
+        {
+            var properties = new Dictionary<string, object>();
+
+            if (options == null)
+            {
+                return properties;
+            }
+
+            var queueId = options.QueueId?.Trim();
+            if (!string.IsNullOrEmpty(queueId))
+            {
+                properties[MatchmakingPropertyKeys.QueueId] = queueId;
+            }
+
+            var modeId = options.ModeId?.Trim();
+            if (!string.IsNullOrEmpty(modeId))
+            {
+                properties[MatchmakingPropertyKeys.ModeId] = modeId;
+            }
+
+            var mapId = options.MapId?.Trim();
+            if (!string.IsNullOrEmpty(mapId))
+            {
+                properties[MatchmakingPropertyKeys.MapId] = mapId;
+            }
+
+            if (options.CustomProperties != null && options.CustomProperties.Count > 0)
+            {
+                foreach (var kvp in options.CustomProperties)
+                {
+                    if (string.IsNullOrEmpty(kvp.Key))
+                    {
+                        continue;
+                    }
+
+                    properties[kvp.Key] = kvp.Value;
+                }
+            }
+
+            return properties;
+        }
+
+        private static void ApplyCustomProperties(Photon.Realtime.RoomOptions roomOptions, IReadOnlyDictionary<string, object> customProperties)
+        {
+            if (roomOptions == null || customProperties == null || customProperties.Count == 0)
+            {
+                return;
+            }
+
+            var hashtable = BuildPhotonHashtable(customProperties);
+            if (hashtable.Count == 0)
+            {
+                return;
+            }
+
+            roomOptions.CustomRoomProperties = hashtable;
+
+            var keys = BuildLobbyPropertyKeys(customProperties);
+            if (keys.Length > 0)
+            {
+                roomOptions.CustomRoomPropertiesForLobby = keys;
+            }
+        }
+
+        private static Hashtable BuildPhotonHashtable(IReadOnlyDictionary<string, object> properties)
+        {
+            var hashtable = new Hashtable();
+
+            if (properties == null)
+            {
+                return hashtable;
+            }
+
+            foreach (var kvp in properties)
+            {
+                if (string.IsNullOrEmpty(kvp.Key))
+                {
+                    continue;
+                }
+
+                hashtable[kvp.Key] = kvp.Value;
+            }
+
+            return hashtable;
+        }
+
+        private static string[] BuildLobbyPropertyKeys(IReadOnlyDictionary<string, object> properties)
+        {
+            if (properties == null || properties.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var keys = new List<string>(properties.Count);
+            foreach (var key in properties.Keys)
+            {
+                if (!string.IsNullOrEmpty(key))
+                {
+                    keys.Add(key);
+                }
+            }
+
+            return keys.Count == 0 ? Array.Empty<string>() : keys.ToArray();
+        }
+
+        private static void CopyPhotonHashtable(Hashtable source, Dictionary<string, object> destination)
+        {
+            if (source == null || destination == null)
+            {
+                return;
+            }
+
+            foreach (System.Collections.DictionaryEntry entry in source)
+            {
+                if (entry.Key is string key && !string.IsNullOrEmpty(key))
+                {
+                    destination[key] = entry.Value;
+                }
+            }
+        }
+
         private void CreateQuickMatchRoom()
         {
             var resolved = pendingQuickMatch ?? new QuickMatchOptions();
@@ -247,6 +392,9 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 IsVisible = resolved.IsVisible,
                 IsOpen = resolved.IsOpen,
             };
+
+            var matchProperties = BuildMatchProperties(resolved);
+            ApplyCustomProperties(photonOptions, matchProperties);
 
             PhotonNetwork.CreateRoom(roomCode, photonOptions);
         }
@@ -413,16 +561,22 @@ namespace Pandapp.Multiplayer.Transport.Pun2
         private CoreRoomInfo BuildRoomInfo()
         {
             var room = PhotonNetwork.CurrentRoom;
-            return room == null
-                ? new CoreRoomInfo()
-                : new CoreRoomInfo
-                {
-                    RoomCode = room.Name ?? string.Empty,
-                    MaxPlayers = (byte)room.MaxPlayers,
-                    PlayerCount = room.PlayerCount,
-                    IsOpen = room.IsOpen,
-                    IsVisible = room.IsVisible,
-                };
+            if (room == null)
+            {
+                return new CoreRoomInfo();
+            }
+
+            var info = new CoreRoomInfo
+            {
+                RoomCode = room.Name ?? string.Empty,
+                MaxPlayers = (byte)room.MaxPlayers,
+                PlayerCount = room.PlayerCount,
+                IsOpen = room.IsOpen,
+                IsVisible = room.IsVisible,
+            };
+
+            CopyPhotonHashtable(room.CustomProperties, info.CustomProperties);
+            return info;
         }
 
         private void RefreshPlayers()

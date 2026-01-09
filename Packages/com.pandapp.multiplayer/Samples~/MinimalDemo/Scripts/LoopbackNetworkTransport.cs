@@ -139,12 +139,41 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
 
             var resolved = options ?? new QuickMatchOptions();
             var generatedCode = $"{resolved.RoomCodePrefix}_{Guid.NewGuid():N}".ToUpperInvariant();
+
+            var customProperties = new Dictionary<string, object>();
+            var queueId = resolved.QueueId?.Trim();
+            if (!string.IsNullOrEmpty(queueId))
+            {
+                customProperties[MatchmakingPropertyKeys.QueueId] = queueId;
+            }
+            var modeId = resolved.ModeId?.Trim();
+            if (!string.IsNullOrEmpty(modeId))
+            {
+                customProperties[MatchmakingPropertyKeys.ModeId] = modeId;
+            }
+            var mapId = resolved.MapId?.Trim();
+            if (!string.IsNullOrEmpty(mapId))
+            {
+                customProperties[MatchmakingPropertyKeys.MapId] = mapId;
+            }
+            if (resolved.CustomProperties != null && resolved.CustomProperties.Count > 0)
+            {
+                foreach (var kvp in resolved.CustomProperties)
+                {
+                    if (!string.IsNullOrEmpty(kvp.Key))
+                    {
+                        customProperties[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+
             CreateRoom(new Pandapp.Multiplayer.Core.RoomOptions
             {
                 RoomCode = generatedCode,
                 MaxPlayers = resolved.MaxPlayers,
                 IsOpen = resolved.IsOpen,
                 IsVisible = resolved.IsVisible,
+                CustomProperties = customProperties,
             });
         }
 
@@ -232,12 +261,25 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
 
         private RoomInfo BuildRoomInfo(Pandapp.Multiplayer.Core.RoomOptions options)
         {
-            return new RoomInfo(options.RoomCode, options.MaxPlayers)
+            var info = new RoomInfo(options.RoomCode, options.MaxPlayers)
             {
                 PlayerCount = players.Count,
                 IsOpen = options.IsOpen,
                 IsVisible = options.IsVisible,
             };
+
+            if (options.CustomProperties != null && options.CustomProperties.Count > 0)
+            {
+                foreach (var kvp in options.CustomProperties)
+                {
+                    if (!string.IsNullOrEmpty(kvp.Key))
+                    {
+                        info.CustomProperties[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+
+            return info;
         }
 
         private void RaiseError(TransportErrorCode code, string message)

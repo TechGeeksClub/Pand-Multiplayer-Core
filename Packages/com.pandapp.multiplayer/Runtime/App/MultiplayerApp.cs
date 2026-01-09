@@ -1,10 +1,13 @@
 using Pandapp.Multiplayer.Core;
+using System;
 using UnityEngine;
 
 namespace Pandapp.Multiplayer.App
 {
     public sealed class MultiplayerApp : MonoBehaviour
     {
+        public delegate bool MessageInterceptor(NetworkMessage message);
+
         [Header("Config")]
         [SerializeField] private MultiplayerConfig config;
 
@@ -21,6 +24,8 @@ namespace Pandapp.Multiplayer.App
         public MultiplayerConfig Config => config;
         public INetworkTransport Transport { get; private set; }
         public ISessionService Session => sessionService;
+
+        public event MessageInterceptor MessageInterceptors;
 
         private ISceneLoader sceneLoader;
         private IGameModule gameModule;
@@ -190,7 +195,39 @@ namespace Pandapp.Multiplayer.App
                 return;
             }
 
+            if (IsMessageIntercepted(message))
+            {
+                return;
+            }
+
             gameModule?.OnMessageReceived(message);
+        }
+
+        private bool IsMessageIntercepted(NetworkMessage message)
+        {
+            if (MessageInterceptors == null)
+            {
+                return false;
+            }
+
+            var invocationList = MessageInterceptors.GetInvocationList();
+            for (var i = 0; i < invocationList.Length; i++)
+            {
+                var interceptor = (MessageInterceptor)invocationList[i];
+                try
+                {
+                    if (interceptor(message))
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, this);
+                }
+            }
+
+            return false;
         }
 
         private void LogError(string message)
