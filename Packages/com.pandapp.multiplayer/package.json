@@ -1,0 +1,33 @@
+{
+  "name": "com.pandapp.multiplayer",
+  "displayName": "Pandapp Multiplayer Framework",
+  "version": "0.1.0",
+  "unity": "6000.0",
+  "unityRelease": "2f7",
+  "description": "Reusable multiplayer framework (core + transport adapters) for PandAPP multiplayer games.",
+  "keywords": [
+    "multiplayer",
+    "framework",
+    "networking",
+    "unity",
+    "pandapp"
+  ],
+  "dependencies": {
+    "com.unity.modules.imgui": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Minimal Demo",
+      "description": "Minimal bootstrap + lobby/ready/start flow (Loopback transport).",
+      "path": "Samples~/MinimalDemo"
+    }
+  ],
+  "changelogUrl": "https://github.com/TechGeeksClub/Pand-Multiplayer-Core/releases",
+  "documentationUrl": "https://github.com/TechGeeksClub/Pand-Multiplayer-Core/wiki",
+  "author": {
+    "name": "PandAPP Studio",
+    "email": "hamzaoban3@gmail.com",
+    "url": "https://github.com/pandapp"
+  },
+  "hideInEditor": false
+}

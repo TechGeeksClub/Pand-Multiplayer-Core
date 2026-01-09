@@ -1,0 +1,14 @@
+{
+	"name": "Pandapp.Multiplayer.Core",
+	"rootNamespace": "Pandapp.Multiplayer",
+	"references": [],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": true,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
+}
