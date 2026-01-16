@@ -34,6 +34,7 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
         [SerializeField] private MinimalDemoGameModule gameModule;
 
         private NetworkSpawner cachedSpawner;
+        private NetworkCommandRouter cachedCommandRouter;
         private NetworkPrefabCatalog runtimeCatalog;
         private GameObject playerTemplate;
         private GameObject ballTemplate;
@@ -45,6 +46,11 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
             if (gameModule == null)
             {
                 gameModule = GetComponent<MinimalDemoGameModule>();
+            }
+
+            if (GetComponent<MinimalDemoKickBallHandler>() == null)
+            {
+                gameObject.AddComponent<MinimalDemoKickBallHandler>();
             }
         }
 
@@ -165,6 +171,7 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
             GUILayout.Label("WASD: move your player | Arrow keys: move ball (host only)");
 
             var spawner = GetOrCreateSpawner(app);
+            var commandRouter = GetOrCreateCommandRouter(app);
             GUILayout.Label($"Spawner: {(spawner != null ? spawner.GetType().Name : "<null>")} | Spawned: {(spawner != null ? spawner.SpawnCount.ToString() : "0")}");
 
             var canSpawn = transport != null
@@ -186,6 +193,20 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
             GUILayout.EndHorizontal();
             GUI.enabled = previousEnabled;
 
+            var canKick = transport != null
+                && transport.RoomState == TransportRoomState.InRoom
+                && spawner != null
+                && commandRouter != null
+                && spawner.TryGetFirstSpawnedByPrefabId(BallPrefabId, out _);
+
+            previousEnabled = GUI.enabled;
+            GUI.enabled = previousEnabled && canKick;
+            if (GUILayout.Button("Kick Ball (send to host)", GUILayout.Height(28)))
+            {
+                TryKickBall(spawner, commandRouter);
+            }
+            GUI.enabled = previousEnabled;
+
             GUILayout.Space(12);
             GUILayout.Label("Message");
             messageId = LabeledIntField("MessageId (>= 100)", messageId);
@@ -200,7 +221,11 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
                 }
                 else if (GameplayMessageIds.IsGameplayMessage(messageId))
                 {
-                    Debug.LogError("MessageId is reserved for gameplay primitives (200-209). Use 100-199 or 210+ for your game.");
+                    Debug.LogError("MessageId is reserved for gameplay primitives (180-199). Use 100-179 for your game.");
+                }
+                else if (messageId >= 200)
+                {
+                    Debug.LogError("Photon PUN2 supports message ids only in range 0-199.");
                 }
                 else if (session != null)
                 {
@@ -254,6 +279,27 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
             }
 
             return cachedSpawner;
+        }
+
+        private NetworkCommandRouter GetOrCreateCommandRouter(MultiplayerApp app)
+        {
+            if (app == null)
+            {
+                return null;
+            }
+
+            if (cachedCommandRouter != null)
+            {
+                return cachedCommandRouter;
+            }
+
+            cachedCommandRouter = app.GetComponent<NetworkCommandRouter>();
+            if (cachedCommandRouter == null)
+            {
+                cachedCommandRouter = app.gameObject.AddComponent<NetworkCommandRouter>();
+            }
+
+            return cachedCommandRouter;
         }
 
         private NetworkPrefabCatalog GetOrCreateRuntimeCatalog()
@@ -320,6 +366,22 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
             return template;
         }
 
+        private static void TryKickBall(NetworkSpawner spawner, NetworkCommandRouter commandRouter)
+        {
+            if (spawner == null || commandRouter == null)
+            {
+                return;
+            }
+
+            if (!spawner.TryGetFirstSpawnedByPrefabId(BallPrefabId, out var ball) || ball == null || ball.NetworkId <= 0)
+            {
+                Debug.LogError("Ball is not spawned yet.");
+                return;
+            }
+
+            commandRouter.SendToHost(MinimalDemoKickBallHandler.KickBallCommandId, ball.NetworkId);
+        }
+
         private static void SpawnPlayersAndBall(MultiplayerApp app, NetworkSpawner spawner)
         {
             if (app == null || spawner == null)
@@ -379,7 +441,7 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
 
             spawner.TrySpawnForAll(
                 BallPrefabId,
-                new Vector3(0f, 0.5f, 1.5f),
+                new Vector3(0f, 0.5f, -1.2f),
                 Quaternion.identity,
                 NetworkTransformSync.AuthorityMode.Host,
                 ownerPlayerId: string.Empty,

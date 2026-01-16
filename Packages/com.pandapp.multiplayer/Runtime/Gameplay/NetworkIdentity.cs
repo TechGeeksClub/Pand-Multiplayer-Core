@@ -29,7 +29,10 @@ namespace Pandapp.Multiplayer.Gameplay
             {
                 if (identityKind == IdentityKind.Scene)
                 {
-                    Debug.LogError($"[{nameof(NetworkIdentity)}] NetworkId is not set on '{name}'.", this);
+                    Debug.LogError(
+                        $"[{nameof(NetworkIdentity)}] NetworkId is not set on '{name}'. " +
+                        "If this object is spawned at runtime, set Kind=Spawned on the prefab (NetworkId should stay 0 and will be assigned by NetworkSpawner).",
+                        this);
                 }
                 return;
             }

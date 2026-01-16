@@ -1,21 +1,21 @@
 {
-  "name": "Pandapp.Multiplayer.Transport.Pun2",
-  "rootNamespace": "Pandapp.Multiplayer",
-  "references": [
-    "Pandapp.Multiplayer.Core",
-    "PhotonRealtime",
-    "PhotonUnityNetworking"
-  ],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": false,
-  "precompiledReferences": [],
-  "autoReferenced": true,
-  "defineConstraints": [
-    "PHOTON_UNITY_NETWORKING",
-    "PANDAPP_PHOTON_PUN2"
-  ],
-  "versionDefines": [],
-  "noEngineReferences": false
+    "name": "Pandapp.Multiplayer.Transport.Pun2",
+    "rootNamespace": "Pandapp.Multiplayer",
+    "references": [
+        "Pandapp.Multiplayer.Core",
+        "PhotonRealtime",
+        "PhotonUnityNetworking"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "PHOTON_UNITY_NETWORKING",
+        "PANDAPP_PHOTON_PUN2"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

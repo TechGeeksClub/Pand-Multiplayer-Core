@@ -13,6 +13,14 @@ namespace Pandapp.Multiplayer.Transport.Pun2
 {
     public class Pun2NetworkTransport : MonoBehaviourPunCallbacks, IOnEventCallback, INetworkTransport
     {
+        [Header("Pun2 Tuning")]
+        [Tooltip("If enabled, sets Photon send/serialization rates on Connect for smoother RaiseEvent traffic.")]
+        [SerializeField] private bool applyPhotonRatesOnConnect = true;
+        [Min(10)]
+        [SerializeField] private int photonSendRate = 60;
+        [Min(10)]
+        [SerializeField] private int photonSerializationRate = 60;
+
         private readonly List<PlayerInfo> players = new List<PlayerInfo>();
         private TransportConnectionState connectionState = TransportConnectionState.Disconnected;
         private TransportRoomState roomState = TransportRoomState.None;
@@ -28,9 +36,12 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             get
             {
                 var localPlayer = PhotonNetwork.LocalPlayer;
-                return localPlayer == null
-                    ? string.Empty
-                    : (localPlayer.UserId ?? localPlayer.ActorNumber.ToString());
+                if (localPlayer == null || localPlayer.ActorNumber <= 0)
+                {
+                    return string.Empty;
+                }
+
+                return localPlayer.ActorNumber.ToString();
             }
         }
 
@@ -47,14 +58,16 @@ namespace Pandapp.Multiplayer.Transport.Pun2
         public event Action<NetworkMessage> MessageReceived;
         public event Action<TransportError> Error;
 
-        private void OnEnable()
+        public override void OnEnable()
         {
+            base.OnEnable();
             PhotonNetwork.AddCallbackTarget(this);
         }
 
-        private void OnDisable()
+        public override void OnDisable()
         {
             PhotonNetwork.RemoveCallbackTarget(this);
+            base.OnDisable();
         }
 
         public void Connect(ConnectOptions options)
@@ -66,6 +79,8 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             }
 
             PhotonNetwork.AutomaticallySyncScene = true;
+
+            ApplyPhotonRates();
 
             var playerName = options?.PlayerName;
             PhotonNetwork.NickName = string.IsNullOrEmpty(playerName) ? "Player" : playerName;
@@ -86,6 +101,24 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             {
                 SetConnectionState(TransportConnectionState.Disconnected);
                 RaiseError(new TransportError(TransportErrorCode.ConnectFailed, "ConnectUsingSettings returned false."));
+            }
+        }
+
+        private void ApplyPhotonRates()
+        {
+            if (!applyPhotonRatesOnConnect)
+            {
+                return;
+            }
+
+            if (photonSendRate > 0)
+            {
+                PhotonNetwork.SendRate = photonSendRate;
+            }
+
+            if (photonSerializationRate > 0)
+            {
+                PhotonNetwork.SerializationRate = photonSerializationRate;
             }
         }
 
@@ -239,9 +272,9 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 return;
             }
 
-            if (message.MessageId < byte.MinValue || message.MessageId > byte.MaxValue)
+            if (message.MessageId < 0 || message.MessageId >= 200)
             {
-                RaiseError(new TransportError(TransportErrorCode.InvalidState, "MessageId must fit into a byte for PUN2 RaiseEvent."));
+                RaiseError(new TransportError(TransportErrorCode.InvalidState, "MessageId must be between 0 and 199 for Photon PUN2 (200+ is reserved)."));
                 return;
             }
 
@@ -516,6 +549,11 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 return;
             }
 
+            if (photonEvent.Code >= 200)
+            {
+                return;
+            }
+
             if (roomState != TransportRoomState.InRoom)
             {
                 return;
@@ -646,13 +684,14 @@ namespace Pandapp.Multiplayer.Transport.Pun2
         {
             var info = new PlayerInfo
             {
-                PlayerId = photonPlayer?.UserId ?? photonPlayer?.ActorNumber.ToString() ?? string.Empty,
+                PlayerId = photonPlayer?.ActorNumber.ToString() ?? string.Empty,
                 PlayerName = photonPlayer?.NickName ?? string.Empty,
                 IsHost = photonPlayer != null && photonPlayer.IsMasterClient,
                 IsConnected = true,
             };
 
             info.CustomData["ActorNumber"] = photonPlayer?.ActorNumber ?? -1;
+            info.CustomData["UserId"] = photonPlayer?.UserId ?? string.Empty;
             return info;
         }
 
@@ -717,17 +756,6 @@ namespace Pandapp.Multiplayer.Transport.Pun2
 
         private static string ResolveSenderId(int senderActorNumber)
         {
-            if (PhotonNetwork.CurrentRoom == null)
-            {
-                return senderActorNumber.ToString();
-            }
-
-            if (PhotonNetwork.CurrentRoom.Players != null
-                && PhotonNetwork.CurrentRoom.Players.TryGetValue(senderActorNumber, out var sender))
-            {
-                return sender.UserId ?? sender.ActorNumber.ToString();
-            }
-
             return senderActorNumber.ToString();
         }
     }

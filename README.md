@@ -13,6 +13,10 @@ This repo contains a Unity UPM package:
 - `Packages/com.pandapp.multiplayer/Runtime/Gameplay`
 - `Packages/com.pandapp.multiplayer/Runtime/UI`
 
+## Gameplay
+
+- `NetworkCommandRouter` provides client -> host commands (authoritative actions like kick/shoot) without hardcoding gameplay into transport.
+
 ## Photon PUN2
 
 Photon adapter setup (one-time):

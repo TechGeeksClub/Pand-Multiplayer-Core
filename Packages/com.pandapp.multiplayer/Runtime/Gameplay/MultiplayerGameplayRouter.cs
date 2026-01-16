@@ -97,6 +97,12 @@ namespace Pandapp.Multiplayer.Gameplay
                 return true;
             }
 
+            if (message.MessageId == GameplayMessageIds.Rigidbody2DState)
+            {
+                HandleRigidbody2DState(message);
+                return true;
+            }
+
             if (!DispatchToHandlers(message))
             {
                 Debug.LogWarning($"[{nameof(MultiplayerGameplayRouter)}] Unhandled gameplay message id: {message.MessageId}", this);
@@ -186,12 +192,45 @@ namespace Pandapp.Multiplayer.Gameplay
             sync.ApplyRemoteState(position, rotation, message.SenderId);
         }
 
+        private static void HandleRigidbody2DState(NetworkMessage message)
+        {
+            var payload = message.Payload;
+            if (payload == null || payload.Length < 24)
+            {
+                return;
+            }
+
+            var networkId = BitConverter.ToInt32(payload, 0);
+            var sequence = BitConverter.ToInt32(payload, 4);
+            if (!NetworkObjectRegistry.TryGet(networkId, out var identity) || identity == null)
+            {
+                return;
+            }
+
+            if (!identity.TryGetComponent<NetworkRigidbody2DSync>(out var sync) || sync == null)
+            {
+                return;
+            }
+
+            var position = ReadVector2(payload, 8);
+            var velocity = ReadVector2(payload, 16);
+
+            sync.ApplyRemoteState(position, velocity, sequence, message.SenderId);
+        }
+
         private static Vector3 ReadVector3(byte[] buffer, int offset)
         {
             return new Vector3(
                 BitConverter.ToSingle(buffer, offset),
                 BitConverter.ToSingle(buffer, offset + 4),
                 BitConverter.ToSingle(buffer, offset + 8));
+        }
+
+        private static Vector2 ReadVector2(byte[] buffer, int offset)
+        {
+            return new Vector2(
+                BitConverter.ToSingle(buffer, offset),
+                BitConverter.ToSingle(buffer, offset + 4));
         }
 
         private static Quaternion ReadQuaternion(byte[] buffer, int offset)

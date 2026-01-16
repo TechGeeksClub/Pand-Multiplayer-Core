@@ -3,6 +3,9 @@ using Pandapp.Multiplayer.App;
 using Pandapp.Multiplayer.Core;
 using Pandapp.Multiplayer.Gameplay;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Pandapp.Multiplayer.Samples.MinimalDemo
 {
@@ -84,27 +87,55 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
         {
             var direction = Vector3.zero;
 
-            if (Input.GetKey(leftKey))
+            if (GetKey(leftKey))
             {
                 direction.x -= 1f;
             }
 
-            if (Input.GetKey(rightKey))
+            if (GetKey(rightKey))
             {
                 direction.x += 1f;
             }
 
-            if (Input.GetKey(forwardKey))
+            if (GetKey(forwardKey))
             {
                 direction.z += 1f;
             }
 
-            if (Input.GetKey(backKey))
+            if (GetKey(backKey))
             {
                 direction.z -= 1f;
             }
 
             return direction;
+        }
+
+        private static bool GetKey(KeyCode key)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                return false;
+            }
+
+            switch (key)
+            {
+                case KeyCode.A: return keyboard.aKey.isPressed;
+                case KeyCode.D: return keyboard.dKey.isPressed;
+                case KeyCode.W: return keyboard.wKey.isPressed;
+                case KeyCode.S: return keyboard.sKey.isPressed;
+                case KeyCode.LeftArrow: return keyboard.leftArrowKey.isPressed;
+                case KeyCode.RightArrow: return keyboard.rightArrowKey.isPressed;
+                case KeyCode.UpArrow: return keyboard.upArrowKey.isPressed;
+                case KeyCode.DownArrow: return keyboard.downArrowKey.isPressed;
+                default: return false;
+            }
+#elif ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKey(key);
+#else
+            return false;
+#endif
         }
 
         private bool HasLocalAuthority()
@@ -152,4 +183,3 @@ namespace Pandapp.Multiplayer.Samples.MinimalDemo
         }
     }
 }
-

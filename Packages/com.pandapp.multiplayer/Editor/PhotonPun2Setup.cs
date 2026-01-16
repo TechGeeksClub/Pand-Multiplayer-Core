@@ -288,7 +288,7 @@ namespace Pandapp.Multiplayer.Editor
             }
 
             json.AppendLine("  ],");
-            json.AppendLine($"  \"includePlatforms\": [{string.Join(", ", includePlatforms.Select(p => $"\\\"{p}\\\""))}],");
+            json.AppendLine($"  \"includePlatforms\": [{string.Join(", ", includePlatforms.Select(p => $"\"{p}\""))}],");
             json.AppendLine("  \"excludePlatforms\": [],");
             json.AppendLine("  \"allowUnsafeCode\": false,");
             json.AppendLine("  \"overrideReferences\": false,");

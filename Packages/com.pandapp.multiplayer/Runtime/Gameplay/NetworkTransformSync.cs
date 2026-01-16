@@ -37,6 +37,7 @@ namespace Pandapp.Multiplayer.Gameplay
         [SerializeField] private float interpolationSpeed = 12f;
 
         private NetworkIdentity identity;
+        private Rigidbody2D body2D;
 
         private float sendTimer;
         private Vector3 lastSentPosition;
@@ -67,9 +68,32 @@ namespace Pandapp.Multiplayer.Gameplay
             hasSentOnce = false;
         }
 
+        public void SetSendSettings(
+            float intervalSeconds,
+            float positionThresholdValue,
+            float rotationThresholdDegreesValue,
+            bool syncPositionValue,
+            bool syncRotationValue)
+        {
+            sendIntervalSeconds = Mathf.Max(0f, intervalSeconds);
+            positionThreshold = Mathf.Max(0f, positionThresholdValue);
+            rotationThresholdDegrees = Mathf.Max(0f, rotationThresholdDegreesValue);
+            syncPosition = syncPositionValue;
+            syncRotation = syncRotationValue;
+
+            sendTimer = 0f;
+            hasSentOnce = false;
+        }
+
+        public void SetReceiveSettings(float interpolationSpeedValue)
+        {
+            interpolationSpeed = Mathf.Max(0f, interpolationSpeedValue);
+        }
+
         private void Awake()
         {
             identity = GetComponent<NetworkIdentity>();
+            body2D = GetComponent<Rigidbody2D>();
         }
 
         private void OnEnable()
@@ -97,7 +121,33 @@ namespace Pandapp.Multiplayer.Gameplay
 
             if (hasTarget)
             {
-                ApplyInterpolation(Time.deltaTime);
+                if (!ShouldDriveRigidbody2D())
+                {
+                    ApplyInterpolationTransform(Time.deltaTime);
+                }
+            }
+        }
+
+        private void FixedUpdate()
+        {
+            if (!IsReadyForGameplay())
+            {
+                return;
+            }
+
+            if (IsLocalAuthority())
+            {
+                return;
+            }
+
+            if (!hasTarget)
+            {
+                return;
+            }
+
+            if (ShouldDriveRigidbody2D())
+            {
+                ApplyInterpolationRigidbody2D(Time.fixedDeltaTime);
             }
         }
 
@@ -233,7 +283,15 @@ namespace Pandapp.Multiplayer.Gameplay
             return Quaternion.Angle(rotation, lastSentRotation) >= rotationThresholdDegrees;
         }
 
-        private void ApplyInterpolation(float deltaTime)
+        private bool ShouldDriveRigidbody2D()
+        {
+            return body2D != null
+                && body2D.simulated
+                && body2D.bodyType == RigidbodyType2D.Kinematic
+                && syncPosition;
+        }
+
+        private void ApplyInterpolationTransform(float deltaTime)
         {
             if (interpolationSpeed <= 0f)
             {
@@ -259,6 +317,25 @@ namespace Pandapp.Multiplayer.Gameplay
             {
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, t);
             }
+        }
+
+        private void ApplyInterpolationRigidbody2D(float deltaTime)
+        {
+            if (body2D == null)
+            {
+                return;
+            }
+
+            if (interpolationSpeed <= 0f)
+            {
+                body2D.MovePosition((Vector2)targetPosition);
+                return;
+            }
+
+            var t = 1f - Mathf.Exp(-interpolationSpeed * deltaTime);
+            var current = body2D.position;
+            var next = Vector2.Lerp(current, (Vector2)targetPosition, t);
+            body2D.MovePosition(next);
         }
 
         private static byte[] BuildPayload(int networkId, byte flags, Vector3 position, Quaternion rotation)

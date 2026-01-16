@@ -12,8 +12,11 @@ namespace Pandapp.Multiplayer.App
         [SerializeField] private MultiplayerConfig config;
 
         [Header("Bindings")]
+        [Tooltip("Required. Must implement INetworkTransport.")]
         [SerializeField] private MonoBehaviour transportBehaviour;
+        [Tooltip("Optional. Must implement ISceneLoader. If omitted, a default loader is used.")]
         [SerializeField] private MonoBehaviour sceneLoaderBehaviour;
+        [Tooltip("Optional. Must implement IGameModule (your game-specific module).")]
         [SerializeField] private MonoBehaviour gameModuleBehaviour;
 
         [Header("Lifecycle")]
@@ -128,7 +131,9 @@ namespace Pandapp.Multiplayer.App
                 return transport;
             }
 
-            LogError($"Transport behaviour does not implement {nameof(INetworkTransport)}: {transportBehaviour.GetType().FullName}");
+            LogError(
+                $"Transport behaviour does not implement {nameof(INetworkTransport)}: {transportBehaviour.GetType().FullName}",
+                transportBehaviour);
             return null;
         }
 
@@ -141,7 +146,9 @@ namespace Pandapp.Multiplayer.App
                     return loader;
                 }
 
-                LogError($"SceneLoader behaviour does not implement {nameof(ISceneLoader)}: {sceneLoaderBehaviour.GetType().FullName}");
+                LogError(
+                    $"SceneLoader behaviour does not implement {nameof(ISceneLoader)}: {sceneLoaderBehaviour.GetType().FullName}",
+                    sceneLoaderBehaviour);
             }
 
             return new UnitySceneLoader(config != null ? config.SceneCatalog : null);
@@ -159,7 +166,61 @@ namespace Pandapp.Multiplayer.App
                 return module;
             }
 
-            LogError($"GameModule behaviour does not implement {nameof(IGameModule)}: {gameModuleBehaviour.GetType().FullName}");
+            var candidateCount = 0;
+            MonoBehaviour candidateBehaviour = null;
+            IGameModule candidateModule = null;
+            string candidateTypeNames = null;
+
+            var behaviours = gameModuleBehaviour.GetComponents<MonoBehaviour>();
+            for (var i = 0; i < behaviours.Length; i++)
+            {
+                var behaviour = behaviours[i];
+                if (behaviour == null || ReferenceEquals(behaviour, gameModuleBehaviour))
+                {
+                    continue;
+                }
+
+                if (!(behaviour is IGameModule moduleBehaviour))
+                {
+                    continue;
+                }
+
+                candidateCount++;
+                candidateTypeNames = string.IsNullOrEmpty(candidateTypeNames)
+                    ? behaviour.GetType().FullName
+                    : candidateTypeNames + ", " + behaviour.GetType().FullName;
+
+                if (candidateModule == null)
+                {
+                    candidateBehaviour = behaviour;
+                    candidateModule = moduleBehaviour;
+                }
+            }
+
+            if (candidateCount == 1 && candidateModule != null)
+            {
+                LogWarning(
+                    $"GameModule behaviour does not implement {nameof(IGameModule)}: {gameModuleBehaviour.GetType().FullName}. " +
+                    $"Using {candidateBehaviour.GetType().FullName} found on the same GameObject. " +
+                    "Assign the correct component to silence this warning.",
+                    candidateBehaviour);
+                return candidateModule;
+            }
+
+            if (candidateCount > 1)
+            {
+                LogError(
+                    $"GameModule behaviour does not implement {nameof(IGameModule)}: {gameModuleBehaviour.GetType().FullName}. " +
+                    $"Multiple {nameof(IGameModule)} components found on the same GameObject: {candidateTypeNames}. " +
+                    "Assign the correct one in the inspector.",
+                    gameModuleBehaviour);
+                return null;
+            }
+
+            LogError(
+                $"GameModule behaviour does not implement {nameof(IGameModule)}: {gameModuleBehaviour.GetType().FullName}. " +
+                $"Assign a component implementing {nameof(IGameModule)}.",
+                gameModuleBehaviour);
             return null;
         }
 
@@ -230,9 +291,14 @@ namespace Pandapp.Multiplayer.App
             return false;
         }
 
-        private void LogError(string message)
+        private void LogError(string message, UnityEngine.Object context = null)
         {
-            Debug.LogError($"[{nameof(MultiplayerApp)}] {message}", this);
+            Debug.LogError($"[{nameof(MultiplayerApp)}] {message}", context != null ? context : this);
+        }
+
+        private void LogWarning(string message, UnityEngine.Object context = null)
+        {
+            Debug.LogWarning($"[{nameof(MultiplayerApp)}] {message}", context != null ? context : this);
         }
     }
 }

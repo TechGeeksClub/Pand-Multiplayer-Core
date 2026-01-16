@@ -40,6 +40,52 @@ namespace Pandapp.Multiplayer.Gameplay
             prefabCatalog = catalog;
         }
 
+        public bool TryGetFirstSpawnedByPrefabId(int prefabId, out NetworkIdentity identity)
+        {
+            identity = null;
+
+            if (prefabId <= 0)
+            {
+                return false;
+            }
+
+            foreach (var kvp in spawnedByNetworkId)
+            {
+                var spawned = kvp.Value;
+                if (spawned.PrefabId == prefabId && spawned.Identity != null)
+                {
+                    identity = spawned.Identity;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool TryGetFirstSpawnedByOwner(string ownerPlayerId, int prefabId, out NetworkIdentity identity)
+        {
+            identity = null;
+
+            if (prefabId <= 0 || string.IsNullOrEmpty(ownerPlayerId))
+            {
+                return false;
+            }
+
+            foreach (var kvp in spawnedByNetworkId)
+            {
+                var spawned = kvp.Value;
+                if (spawned.PrefabId == prefabId
+                    && spawned.Identity != null
+                    && string.Equals(spawned.OwnerPlayerId, ownerPlayerId, StringComparison.Ordinal))
+                {
+                    identity = spawned.Identity;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void Awake()
         {
             if (app == null)

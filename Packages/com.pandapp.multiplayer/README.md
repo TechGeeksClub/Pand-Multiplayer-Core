@@ -20,8 +20,10 @@ Unity Package Manager -> **Add package from git URL**:
 
 1) Add `MultiplayerApp` to your Bootstrap scene.
 2) Assign `transportBehaviour` (ex: `Pun2NetworkTransport`).
-3) (Optional) Assign `MultiplayerConfig` + `SceneCatalog`.
-4) Message IDs: Core uses `1-99`. Gameplay primitives use `200-209`. Use `100-199` (or `210+`) for your game.
+3) (Optional) Assign `sceneLoaderBehaviour` (must implement `ISceneLoader`) or leave empty to use the default loader.
+4) (Optional) Assign `gameModuleBehaviour` (must implement `IGameModule`) to handle player/message/update callbacks (helper base: `GameModuleBehaviourBase`).
+5) (Optional) Assign `MultiplayerConfig` + `SceneCatalog`.
+6) Message IDs: Core uses `1-99`. Gameplay primitives use `180-199`. Use `100-179` for your game (Photon PUN2 supports only `0-199`).
 
 ## Matchmaking
 
@@ -34,6 +36,7 @@ Unity Package Manager -> **Add package from git URL**:
 - `NetworkTransformSync` replicates transform state (host/owner authority + interpolation).
 - `NetworkPrefabCatalog` maps `PrefabId -> prefab` for network spawning.
 - `NetworkSpawner` lets the host spawn/despawn objects + replicate ownership (syncs existing spawns to late joiners).
+- `NetworkCommandRouter` routes client -> host commands (reserved message id: `184`) via `INetworkCommandHandler`.
 
 ## Photon PUN2 (CS0234 fix)
 
