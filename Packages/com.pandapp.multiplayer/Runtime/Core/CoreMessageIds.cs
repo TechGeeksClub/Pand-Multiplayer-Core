@@ -1,7 +1,7 @@
 namespace Pandapp.Multiplayer.Core
 {
     public static class CoreMessageIds
-    {
+    { 
         public const int ReservedMin = 1;
         public const int ReservedMax = 99;
 

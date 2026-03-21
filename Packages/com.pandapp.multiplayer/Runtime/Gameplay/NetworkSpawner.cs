@@ -34,10 +34,16 @@ namespace Pandapp.Multiplayer.Gameplay
 
         public NetworkPrefabCatalog PrefabCatalog => prefabCatalog;
         public int SpawnCount => spawnedByNetworkId.Count;
+        public bool DespawnOwnedObjectsOnPlayerLeft => despawnOwnedObjectsOnPlayerLeft;
 
         public void SetPrefabCatalog(NetworkPrefabCatalog catalog)
         {
             prefabCatalog = catalog;
+        }
+
+        public void SetDespawnOwnedObjectsOnPlayerLeft(bool enabled)
+        {
+            despawnOwnedObjectsOnPlayerLeft = enabled;
         }
 
         public bool TryGetFirstSpawnedByPrefabId(int prefabId, out NetworkIdentity identity)

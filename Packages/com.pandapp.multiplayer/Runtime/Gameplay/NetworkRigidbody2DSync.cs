@@ -71,6 +71,7 @@ namespace Pandapp.Multiplayer.Gameplay
         private Vector2 predictedPosition;
         private Vector2 predictedVelocity;
         private bool hasPredictedState;
+        private bool wasLocalAuthority;
 
         private float predictionHoldRemainingSeconds;
         private float predictionHoldTotalSeconds;
@@ -192,6 +193,18 @@ namespace Pandapp.Multiplayer.Gameplay
             predictionHoldRemainingSeconds = Mathf.Max(predictionHoldRemainingSeconds, holdSeconds);
         }
 
+        public void RefreshAuthorityState()
+        {
+            var isLocalAuthority = IsLocalAuthority();
+            if (isLocalAuthority == wasLocalAuthority)
+            {
+                return;
+            }
+
+            HandleAuthorityTransition(isLocalAuthority);
+            wasLocalAuthority = isLocalAuthority;
+        }
+
         private void Awake()
         {
             identity = GetComponent<NetworkIdentity>();
@@ -202,6 +215,7 @@ namespace Pandapp.Multiplayer.Gameplay
         {
             MultiplayerGameplayRouter.EnsureForApp(MultiplayerApp.Instance);
             ResetRemoteState();
+            wasLocalAuthority = false;
         }
 
         private void FixedUpdate()
@@ -211,7 +225,10 @@ namespace Pandapp.Multiplayer.Gameplay
                 return;
             }
 
-            if (IsLocalAuthority())
+            RefreshAuthorityState();
+            var isLocalAuthority = wasLocalAuthority;
+
+            if (isLocalAuthority)
             {
                 sendTimer += Time.fixedDeltaTime;
                 if (sendTimer >= sendIntervalSeconds)
@@ -226,6 +243,37 @@ namespace Pandapp.Multiplayer.Gameplay
             if (hasNetworkState)
             {
                 ApplyRemote(Time.fixedDeltaTime);
+            }
+        }
+
+        private void HandleAuthorityTransition(bool isLocalAuthority)
+        {
+            if (body == null)
+            {
+                return;
+            }
+
+            if (!isLocalAuthority)
+            {
+                return;
+            }
+
+            if (body.bodyType != RigidbodyType2D.Dynamic)
+            {
+                body.bodyType = RigidbodyType2D.Dynamic;
+            }
+
+            if (hasPredictedState)
+            {
+                body.position = predictedPosition;
+                body.linearVelocity = predictedVelocity;
+                return;
+            }
+
+            if (hasNetworkState)
+            {
+                body.position = networkPosition;
+                body.linearVelocity = networkVelocity;
             }
         }
 
