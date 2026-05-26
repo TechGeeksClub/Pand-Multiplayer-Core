@@ -107,6 +107,22 @@ namespace Pandapp.Multiplayer.App
 
         public void RequestStart(SceneId sceneId) => sessionService?.RequestStart(sceneId);
 
+        public bool TrySetRoomAccess(bool isOpen, bool isVisible)
+        {
+            return Transport is IRoomAccessTransport roomAccessTransport
+                && roomAccessTransport.TrySetRoomAccess(isOpen, isVisible);
+        }
+
+        public int LocalPingMilliseconds => Transport is IHostSelectionTransport hostSelectionTransport
+            ? hostSelectionTransport.LocalPingMilliseconds
+            : -1;
+
+        public bool TrySetHost(string playerId)
+        {
+            return Transport is IHostSelectionTransport hostSelectionTransport
+                && hostSelectionTransport.TrySetHost(playerId);
+        }
+
         public void RequestStartConfiguredGame()
         {
             if (config == null)

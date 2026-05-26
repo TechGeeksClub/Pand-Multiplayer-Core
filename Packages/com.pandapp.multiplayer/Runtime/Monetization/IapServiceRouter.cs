@@ -51,6 +51,23 @@ namespace Pandapp.Multiplayer.Monetization
             activeService.RestorePurchases(callback);
         }
 
+        public bool HasReceipt(string productId)
+        {
+            return activeService is IIapReceiptService receiptService
+                && receiptService.HasReceipt(productId);
+        }
+
+        public bool TryGetLocalizedPriceString(string productId, out string price)
+        {
+            if (activeService is IIapProductMetadataService metadataService)
+            {
+                return metadataService.TryGetLocalizedPriceString(productId, out price);
+            }
+
+            price = string.Empty;
+            return false;
+        }
+
         private IIapService ResolveService()
         {
             if (settings == null || settings.iapProvider == IapProvider.None)

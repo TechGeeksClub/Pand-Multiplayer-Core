@@ -13,6 +13,7 @@
     "pandapp"
   ],
   "dependencies": {
+    "com.unity.purchasing": "5.0.4",
     "com.unity.modules.imgui": "1.0.0"
   },
   "samples": [

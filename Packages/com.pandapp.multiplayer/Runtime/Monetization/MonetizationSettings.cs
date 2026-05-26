@@ -1,7 +1,17 @@
 using UnityEngine;
+using UnityEngine.Purchasing;
 
 namespace Pandapp.Multiplayer.Monetization
 {
+    [System.Serializable]
+    public struct IapProductDefinition
+    {
+        public string productId;
+        public ProductType productType;
+        public int coinAmount;
+        public bool grantsNoAds;
+    }
+
     [CreateAssetMenu(menuName = "Pandapp/Monetization/Settings", fileName = "MonetizationSettings")]
     public sealed class MonetizationSettings : ScriptableObject
     {
@@ -25,6 +35,7 @@ namespace Pandapp.Multiplayer.Monetization
         public string bannerPlacementId = MonetizationConstants.DefaultBannerPlacementId;
 
         [Header("IAP Products")]
+        public IapProductDefinition[] products = new IapProductDefinition[0];
         public string[] productIds = new string[0];
 
         public string GetUnityAdsGameId()

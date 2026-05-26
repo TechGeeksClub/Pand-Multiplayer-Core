@@ -35,4 +35,15 @@ namespace Pandapp.Multiplayer.Core
 
         void Send(NetworkMessage message, SendOptions options);
     }
+
+    public interface IRoomAccessTransport
+    {
+        bool TrySetRoomAccess(bool isOpen, bool isVisible);
+    }
+
+    public interface IHostSelectionTransport
+    {
+        int LocalPingMilliseconds { get; }
+        bool TrySetHost(string playerId);
+    }
 }

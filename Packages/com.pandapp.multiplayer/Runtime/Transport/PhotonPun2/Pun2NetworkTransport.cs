@@ -7,11 +7,12 @@ using Photon.Realtime;
 using UnityEngine;
 using Pandapp.Multiplayer.Core;
 using CoreRoomInfo = Pandapp.Multiplayer.Core.RoomInfo;
+using IEnumerator = System.Collections.IEnumerator;
 using PhotonSendOptions = ExitGames.Client.Photon.SendOptions;
 
 namespace Pandapp.Multiplayer.Transport.Pun2
 {
-    public class Pun2NetworkTransport : MonoBehaviourPunCallbacks, IOnEventCallback, INetworkTransport
+    public class Pun2NetworkTransport : MonoBehaviourPunCallbacks, IOnEventCallback, INetworkTransport, IRoomAccessTransport, IHostSelectionTransport
     {
         [Header("Pun2 Tuning")]
         [Tooltip("If enabled, sets Photon send/serialization rates on Connect for smoother RaiseEvent traffic.")]
@@ -21,12 +22,25 @@ namespace Pandapp.Multiplayer.Transport.Pun2
         [Min(10)]
         [SerializeField] private int photonSerializationRate = 60;
 
+        [Header("Quick Match")]
+        [Tooltip("How long quick match keeps looking for an existing room before creating a new one.")]
+        [Min(0.25f)]
+        [SerializeField] private float quickMatchCreateDelaySeconds = 2.5f;
+        [Tooltip("Extra random delay added before creating a quick-match room to avoid two clients creating separate rooms at the same time.")]
+        [Min(0f)]
+        [SerializeField] private float quickMatchCreateJitterSeconds = 1.5f;
+        [Tooltip("How often quick match retries JoinRandomRoom while waiting to create a room.")]
+        [Min(0.25f)]
+        [SerializeField] private float quickMatchJoinRetryIntervalSeconds = 0.5f;
+
         private readonly List<PlayerInfo> players = new List<PlayerInfo>();
         private TransportConnectionState connectionState = TransportConnectionState.Disconnected;
         private TransportRoomState roomState = TransportRoomState.None;
         private QuickMatchOptions pendingQuickMatch;
         private bool quickMatchActive;
         private bool quickMatchWaitingLobby;
+        private bool quickMatchJoinRequestPending;
+        private Coroutine quickMatchCoroutine;
 
         public TransportConnectionState ConnectionState => connectionState;
         public TransportRoomState RoomState => roomState;
@@ -48,6 +62,8 @@ namespace Pandapp.Multiplayer.Transport.Pun2
         public string LocalPlayerName => PhotonNetwork.NickName ?? string.Empty;
 
         public IReadOnlyList<PlayerInfo> Players => players;
+
+        public int LocalPingMilliseconds => PhotonNetwork.IsConnected ? PhotonNetwork.GetPing() : -1;
 
         public event Action<TransportConnectionState> ConnectionStateChanged;
         public event Action<TransportRoomState> RoomStateChanged;
@@ -209,10 +225,54 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 quickMatchWaitingLobby = false;
             }
 
-            TryJoinRandomRoomOrCreate();
+            StartQuickMatchSearch();
         }
 
-        private void TryJoinRandomRoomOrCreate()
+        private void StartQuickMatchSearch()
+        {
+            StopQuickMatchSearch();
+            quickMatchCoroutine = StartCoroutine(QuickMatchSearchRoutine());
+        }
+
+        private void StopQuickMatchSearch()
+        {
+            if (quickMatchCoroutine != null)
+            {
+                StopCoroutine(quickMatchCoroutine);
+                quickMatchCoroutine = null;
+            }
+
+            quickMatchJoinRequestPending = false;
+        }
+
+        private IEnumerator QuickMatchSearchRoutine()
+        {
+            var createDelay = Mathf.Max(0.25f, quickMatchCreateDelaySeconds)
+                + UnityEngine.Random.Range(0f, Mathf.Max(0f, quickMatchCreateJitterSeconds));
+            var createAt = Time.realtimeSinceStartup + createDelay;
+            var retryInterval = Mathf.Max(0.25f, quickMatchJoinRetryIntervalSeconds);
+
+            while (quickMatchActive && !IsInPhotonRoom())
+            {
+                if (PhotonNetwork.IsConnectedAndReady && !quickMatchJoinRequestPending)
+                {
+                    if (Time.realtimeSinceStartup >= createAt)
+                    {
+                        CreateQuickMatchRoom();
+                    }
+                    else
+                    {
+                        TryJoinRandomRoom();
+                    }
+                }
+
+                yield return new WaitForSeconds(retryInterval);
+            }
+
+            quickMatchCoroutine = null;
+        }
+
+        private void TryJoinRandomRoom()
         {
             var resolved = pendingQuickMatch ?? new QuickMatchOptions();
             var matchProperties = BuildMatchProperties(resolved);
@@ -231,10 +291,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 joinResult = PhotonNetwork.JoinRandomRoom(expectedProperties, expectedMaxPlayers);
             }
 
-            if (!joinResult)
-            {
-                CreateQuickMatchRoom();
-            }
+            quickMatchJoinRequestPending = joinResult;
         }
 
         public void LeaveRoom()
@@ -251,6 +308,51 @@ namespace Pandapp.Multiplayer.Transport.Pun2
 
             SetRoomState(TransportRoomState.Leaving);
             PhotonNetwork.LeaveRoom();
+        }
+
+        public bool TrySetRoomAccess(bool isOpen, bool isVisible)
+        {
+            if (!IsInPhotonRoom() || PhotonNetwork.CurrentRoom == null)
+            {
+                return false;
+            }
+
+            PhotonNetwork.CurrentRoom.IsOpen = isOpen;
+            PhotonNetwork.CurrentRoom.IsVisible = isVisible;
+            return true;
+        }
+
+        public bool TrySetHost(string playerId)
+        {
+            if (!IsInPhotonRoom() || PhotonNetwork.CurrentRoom == null)
+            {
+                return false;
+            }
+
+            var targetActor = ResolveActorNumber(playerId);
+            if (targetActor <= 0)
+            {
+                return false;
+            }
+
+            var master = PhotonNetwork.MasterClient;
+            if (master != null && master.ActorNumber == targetActor)
+            {
+                return true;
+            }
+
+            if (!PhotonNetwork.CurrentRoom.Players.TryGetValue(targetActor, out var targetPlayer) || targetPlayer == null)
+            {
+                return false;
+            }
+
+            var result = PhotonNetwork.SetMasterClient(targetPlayer);
+            if (result)
+            {
+                RefreshHostFlags();
+            }
+
+            return result;
         }
 
         public void Send(NetworkMessage message, Pandapp.Multiplayer.Core.SendOptions options)
@@ -429,7 +531,26 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             var matchProperties = BuildMatchProperties(resolved);
             ApplyCustomProperties(photonOptions, matchProperties);
 
-            PhotonNetwork.CreateRoom(roomCode, photonOptions);
+            var expectedProperties = matchProperties.Count == 0
+                ? null
+                : BuildPhotonHashtable(matchProperties);
+
+            quickMatchJoinRequestPending = PhotonNetwork.JoinRandomOrCreateRoom(
+                expectedProperties,
+                resolved.MaxPlayers,
+                MatchmakingMode.FillRoom,
+                null,
+                null,
+                roomCode,
+                photonOptions);
+
+            if (!quickMatchJoinRequestPending)
+            {
+                quickMatchActive = false;
+                pendingQuickMatch = null;
+                SetRoomState(TransportRoomState.None);
+                RaiseError(new TransportError(TransportErrorCode.CreateRoomFailed, "JoinRandomOrCreateRoom returned false."));
+            }
         }
 
         private static string BuildQuickMatchRoomCode(QuickMatchOptions options)
@@ -454,6 +575,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             quickMatchActive = false;
             pendingQuickMatch = null;
             quickMatchWaitingLobby = false;
+            StopQuickMatchSearch();
             players.Clear();
             SetRoomState(TransportRoomState.None);
             SetConnectionState(TransportConnectionState.Disconnected);
@@ -463,6 +585,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
         {
             quickMatchActive = false;
             quickMatchWaitingLobby = false;
+            StopQuickMatchSearch();
             RefreshPlayers();
             SetRoomState(TransportRoomState.InRoom);
             RoomJoined?.Invoke(BuildRoomInfo());
@@ -476,7 +599,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             }
 
             quickMatchWaitingLobby = false;
-            TryJoinRandomRoomOrCreate();
+            StartQuickMatchSearch();
         }
 
         public override void OnJoinRandomFailed(short returnCode, string message)
@@ -488,7 +611,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
                 return;
             }
 
-            CreateQuickMatchRoom();
+            quickMatchJoinRequestPending = false;
         }
 
         public override void OnLeftRoom()
@@ -496,6 +619,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             quickMatchActive = false;
             pendingQuickMatch = null;
             quickMatchWaitingLobby = false;
+            StopQuickMatchSearch();
             players.Clear();
             SetRoomState(TransportRoomState.None);
             RoomLeft?.Invoke();
@@ -506,6 +630,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             quickMatchActive = false;
             pendingQuickMatch = null;
             quickMatchWaitingLobby = false;
+            StopQuickMatchSearch();
             SetRoomState(TransportRoomState.None);
             RaiseError(new TransportError(TransportErrorCode.JoinRoomFailed, $"{returnCode}: {message}"));
         }
@@ -515,6 +640,7 @@ namespace Pandapp.Multiplayer.Transport.Pun2
             quickMatchActive = false;
             pendingQuickMatch = null;
             quickMatchWaitingLobby = false;
+            StopQuickMatchSearch();
             SetRoomState(TransportRoomState.None);
             RaiseError(new TransportError(TransportErrorCode.CreateRoomFailed, $"{returnCode}: {message}"));
         }

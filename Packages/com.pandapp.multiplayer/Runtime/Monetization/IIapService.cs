@@ -11,4 +11,14 @@ namespace Pandapp.Multiplayer.Monetization
         void Purchase(string productId, Action<IapPurchaseResult> callback);
         void RestorePurchases(Action<bool> callback);
     }
+
+    public interface IIapReceiptService
+    {
+        bool HasReceipt(string productId);
+    }
+
+    public interface IIapProductMetadataService
+    {
+        bool TryGetLocalizedPriceString(string productId, out string price);
+    }
 }

@@ -1,6 +1,8 @@
 {
   "name": "Pandapp.Multiplayer.Monetization",
-  "references": [],
+  "references": [
+    "Unity.Purchasing"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
